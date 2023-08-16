@@ -42,6 +42,10 @@ router = APIRouter()
 user_db = json_db.DB("DB/users.json")
 
 
+def str_hash(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def create_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     if expires_delta:
@@ -56,8 +60,9 @@ def create_token(data: dict, expires_delta: timedelta = None):
 
 def create_access_token(user_id):
     user_db.load()
-    token = create_token({"userid": user_db()[user_id]["userid"]}, timedelta(minutes=15))
-    user_db()[user_id]["access_token"] = token
+    user_id_hash = str_hash(user_id)
+    token = create_token({"userid": user_db()[user_id_hash]["userid"]}, timedelta(minutes=15))
+    user_db()[user_id_hash]["access_token"] = token
     user_db.dump()
     return token
 
@@ -72,17 +77,20 @@ def create_access_token(user_id):
                         409: {"model": Message}})
 async def create_account(auth_data: OAuth2PasswordRequestForm = Depends()):
     user_db.load()
-    user_id = hashlib.sha256(auth_data.username.encode("utf-8")).hexdigest()
+    user_id = str_hash(auth_data.username)
     if user_id in user_db():
         return Response(status_code=status.HTTP_409_CONFLICT)
     else:
-        hash_ps = hashlib.sha256(auth_data.password.encode("utf-8")).hexdigest()
+        hash_ps = str_hash(auth_data.password)
         user_db()[user_id] = {
             "permission": 0,
             "userid": auth_data.username,
-            "password": hash_ps,
-            "access_token": create_access_token(auth_data.username)
+            "password": hash_ps
         }
+        user_db.dump()
+
+        create_access_token(auth_data.username)
+
         user_db.dump()
         return Response(status_code=status.HTTP_201_CREATED)
 
@@ -96,11 +104,12 @@ async def create_account(auth_data: OAuth2PasswordRequestForm = Depends()):
                         401: {"model": Message}})
 async def get_access_token(auth_data: OAuth2PasswordRequestForm = Depends()):
     user_db.load()
-    user_id = hashlib.sha256(auth_data.username.encode("utf-8")).hexdigest()
-    user_pw = hashlib.sha256(auth_data.password.encode("utf-8")).hexdigest()
+    user_id = auth_data.username
+    user_id_hash = str_hash(user_id)
+    user_pw = str_hash(auth_data.password)
 
-    if user_id in user_db():
-        if user_db()[user_id]["password"] == user_pw:
+    if user_id_hash in user_db():
+        if user_db()[user_id_hash]["password"] == user_pw:
             token = create_access_token(user_id)
             return JSONResponse(status_code=status.HTTP_201_CREATED,
                                 content={"token_type": "bearer",
@@ -115,11 +124,11 @@ def token_auth(token: str = Depends(oauth2_scheme)):
     payload = jwt.decode(token, KEY, ALGORITHM)
 
     user_id = payload["userid"]
-    hash_user_id = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+    hash_user_id = str_hash(user_id)
 
     user_id = user_id if hash_user_id in user_db() else ""
     auth = False
-    if datetime.utcnow() .timestamp() < payload["exp"] and user_id != "":
+    if datetime.utcnow().timestamp() < payload["exp"] and user_id != "":
         if user_db()[hash_user_id]["access_token"] == token:
             auth = True
     permission = user_db()[hash_user_id]["permission"] if auth else -1
@@ -136,6 +145,19 @@ def token_auth(token: str = Depends(oauth2_scheme)):
 #     return auth
 
 @router.delete("/user/delete")
-def delete_account():
-    pass
+def delete_account(delete_id: str, auth: auth_info = Depends(token_auth)):
+    if auth.auth is False:
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    user_db.load()
+    if str_hash(delete_id) not in user_db():
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    delete_user = user_db()[str_hash(delete_id)]
+    if auth.permission < delete_user["permission"] or auth.user_id == delete_user["userid"]:
+        user_db().pop(str_hash(delete_id))
+        user_db.dump()
+        return JSONResponse(status_code=status.HTTP_200_OK, content=delete_user)
+    else:
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
 
