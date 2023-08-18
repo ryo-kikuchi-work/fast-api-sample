@@ -85,7 +85,8 @@ async def create_account(auth_data: OAuth2PasswordRequestForm = Depends()):
         user_db()[user_id] = {
             "permission": 0,
             "userid": auth_data.username,
-            "password": hash_ps
+            "password": hash_ps,
+            "balance": 5000
         }
         user_db.dump()
 
@@ -139,11 +140,6 @@ def token_auth(token: str = Depends(oauth2_scheme)):
     return auth_info(user_id, auth, permission)
 
 
-# @router.get('/user/{user_id}')
-# def get_dict(user_id: str, auth: auth_info = Depends(token_auth)):
-#     user_db.load()
-#     return auth
-
 @router.delete("/user/delete")
 def delete_account(delete_id: str, auth: auth_info = Depends(token_auth)):
     if auth.auth is False:
@@ -160,4 +156,3 @@ def delete_account(delete_id: str, auth: auth_info = Depends(token_auth)):
         return JSONResponse(status_code=status.HTTP_200_OK, content=delete_user)
     else:
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
-

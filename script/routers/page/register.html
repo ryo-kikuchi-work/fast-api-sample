@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign In</title>
+    <script>
+        async function signIn(event) {
+            event.preventDefault();
+
+            let formData = new FormData(event.target);
+            let response = await fetch('/users/register/', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.status === 201) {
+                // サインイン成功
+                alert("Your account has been successfully created.");
+                window.location.href = "/";  // 例: ホームページへの遷移
+            } else if (response.status === 409){
+                // 同一のユーザ名が既に使われています.
+                alert("This username is already registered.");
+            }
+            else {
+                // サインイン失敗
+                alert("Failed to sign in.");
+            }
+        }
+    </script>
+</head>
+<body>
+    <form onsubmit="signIn(event)" >
+        <div>
+            <label for="username">ID:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div>
+            <input type="submit" value="Sign In">
+        </div>
+    </form>
+    <button onclick="location.href='/'">戻る</button>
+</body>
+</html>

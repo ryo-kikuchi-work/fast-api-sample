@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Log In</title>
+    <script>
+        async function logIn(event) {
+            event.preventDefault();
+
+            let formData = new FormData(event.target);
+            let response = await fetch('/users/login/', {
+                method: 'POST',
+                body: formData
+            });
+            if (response.status === 201) {
+                // ログイン成功
+                alert("You have successfully logged in.");
+                const json_response = await response.json();
+                const accessToken = json_response.access_token;
+                setCookie('access_token', accessToken, 15);
+                window.location.href = "/users/mypage";  // 例: ホームページへの遷移
+            }
+            else {
+                // ログイン失敗
+                alert("Failed to log in.");
+            }
+        }
+        function setCookie(name, value, minutes, path = '/', samesite = 'None') {
+            const date = new Date();
+            date.setTime(date.getTime() + (minutes * 60 * 1000));
+            const expires = "; expires=" + date.toUTCString();
+            document.cookie = name + "=" + (value || "")  + expires + "; path=" + path + "; Secure; SameSite=" + samesite;
+
+        }
+    </script>
+</head>
+<body>
+    <form onsubmit="logIn(event)">
+        <div>
+            <label for="username">ID:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div>
+            <input type="submit" value="Log In">
+        </div>
+    </form>
+    <button onclick="location.href='/'">戻る</button>
+</body>
+</html>
