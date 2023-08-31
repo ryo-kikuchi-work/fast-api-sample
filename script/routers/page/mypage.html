@@ -1,14 +1,402 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
+    <meta charset="UTF-8">
     <title>{{ user.userid }}'s Page</title>
+
 </head>
+<style>
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+.ball {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid black;
+    background-color: gray;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: dropBall 2s forwards;
+}
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+.message-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeInOut 1.5s forwards;
+}
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 2.0s forwards;
+}
+@keyframes dropBall {
+    to {
+        top: 80vh;
+    }
+}
+.redBall {
+    background-color: red;
+}
+.greenBall {
+    background-color: green;
+}
+.blueBall {
+    background-color: blue;
+}
+.goldBall {
+    background-color: yellow;
+}
+.whiteBall {
+    background-color: white;
+    border-color: black;
+}
+.grayBall {
+    background-color: gray;
+}
+.blackBall {
+    background-color: black;
+    border-color: gray;
+}
+@keyframes flash {
+    0%, 100% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.frame {
+    position: fixed;
+    background-color: transparent;
+    animation: flash 2.0s forwards;
+    z-index: 10000;
+}
+
+.frame.top, .frame.bottom {
+    left: 0;
+    right: 0;
+    height: 5px; /* この値を変更して、フレームの厚さを調整します */
+}
+
+.frame.top {
+    top: 0;
+}
+
+.frame.bottom {
+    bottom: 0;
+}
+
+.frame.left, .frame.right {
+    top: 0;
+    bottom: 0;
+    width: 5px; /* この値を変更して、フレームの厚さを調整します */
+}
+
+.frame.left {
+    left: 0;
+}
+
+.frame.right {
+    right: 0;
+}
+</style>
 <body>
     <header>
         <h1>名前:{{ user.userid }}</h1>
     </header>
     <section>
-        <h2>所持金: {{ user.balance }}円</h2>
+        <h2 id="userBalance">所持金: {{ user.balance }}玉</h2>
     </section>
+    <section>
+        <h2 id="kakuhen">確変(残り): {{ user.kakuhen }}回</h2>
+    </section>
+    <section>
+        <h2 id="stockInfo">保留: []</h2>
+    </section>
+    <section>
+        <h2 id="total">TOTAL: 0 </h2>
+        <h2 id="get_per">GET: 0/0 </h2>
+    </section>
+    <section>
+        <h2>抽選結果:</h2>
+        <p id="slotResult" style="font-size: 2em;">抽選のボタンを押して, 保留を消化！</p>
+        抽選:
+        <label class="switch">
+            <input type="checkbox" id="toggleSwitchSlot">
+            <span class="slider"></span>
+        </label>
+    </section>
+    <br>
+    <section>
+        射出:
+        <label class="switch">
+            <input type="checkbox" id="toggleSwitchShot">
+            <span class="slider"></span>
+        </label>
+    </section>
+    <div id="ballArea"></div>
 </body>
+<script>
+    const flashColor = {
+            '赤': 'red',
+            '緑': 'green',
+            '青': 'blue',
+            '金': 'gold',
+            '白': 'white',
+            '灰': 'gray'
+        };
+
+    function s_flash(color) {
+        const createFrame = (position) => {
+                const frame = document.createElement('div');
+                frame.className = `frame ${position}`;
+                frame.style.backgroundColor = flashColor[color];
+                document.body.appendChild(frame);
+                return frame;
+            };
+
+        const topFrame = createFrame('top');
+        const bottomFrame = createFrame('bottom');
+        const leftFrame = createFrame('left');
+        const rightFrame = createFrame('right');
+
+        setTimeout(() => {
+                topFrame.remove();
+                bottomFrame.remove();
+                leftFrame.remove();
+                rightFrame.remove();
+            }, 2500);
+    }
+
+    const colorMapping = {
+            '赤': 'redBall',
+            '緑': 'greenBall',
+            '青': 'blueBall',
+            '金': 'goldBall',
+            '白': 'whiteBall',
+            '灰': 'grayBall',
+            '黒': 'blackBall'
+        };
+
+    let messageQueue = [];
+    let isShowingMessage = false;
+    function showMessage(message) {
+        messageQueue.push({ message });
+
+        if (!isShowingMessage) {
+            displayMessage();
+        }
+    }
+
+    function displayMessage() {
+        if (messageQueue.length === 0) {
+            isShowingMessage = false;
+            return;
+        }
+
+        isShowingMessage = true;
+
+        const { message } = messageQueue.shift();
+
+        const messageElem = document.createElement('div');
+        messageElem.textContent = message;
+        messageElem.style.fontSize = '5em';
+        document.body.appendChild(messageElem);
+
+        setTimeout(() => {
+            messageElem.remove();
+            displayMessage();
+        }, 1500);
+    }
+
+    function trySlot() {
+        if (messageQueue.length > 0 || isShowingMessage) {
+            return;
+        }
+        fetch('/users/try', {
+            method: 'Get'
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            else{
+                const slotResultElem = document.getElementById("slotResult");
+                slotResultElem.innerText = "保留を貯めよう!";
+            }
+        })
+        .then(data => {
+        if(data){
+                document.getElementById("kakuhen").innerText = "確変(残り): " + data.user.kakuhen + "回";
+                document.getElementById("total").innerText = "TOTAL: " + data.user.total;
+                document.getElementById("get_per").innerText = "GET: " + data.user.now_get + "/" + data.user.get;
+                document.getElementById("userBalance").innerText = "所持金: " + data.user.balance + "玉";
+                document.getElementById("stockInfo").innerText = "保留: [" + data.user.stock_display.join(',') + "]";
+                const slotResultElem = document.getElementById("slotResult");
+
+                if (data.result.effect != "白"){
+                    s_flash(data.result.effect);
+                }
+                if (data.result.continue){
+                    showMessage("HTTP 100 Continue");
+                    return;
+                }
+
+                if (data.result.riichi){
+                    showMessage("リーチ!");
+                }
+                if (data.result.alert){
+                    if (data.result.hot){
+                        showMessage("HTTP 200 OK!");
+                    }
+                    else {
+                        showMessage("HTTP 404 Not Found");
+                    }
+                }
+
+                slotResultElem.classList.remove('fade-in');
+
+                slotResultElem.innerText = data.result.lille.join(' | ');
+
+                void slotResultElem.offsetWidth;
+                slotResultElem.classList.add('fade-in');
+
+
+                if (data.result.jackpot){
+                    showMessage("大当たり！");
+                    showMessage(data.user.kakuhen + "Rush獲得");
+                    showMessage(data.user.get + "玉獲得");
+                }
+
+            }
+        });
+    }
+
+    function shot() {
+        fetch('/users/shot', {
+            method: 'Get'
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+        })
+        .then(data => {
+         if(data){
+            document.getElementById("kakuhen").innerText = "確変(残り): " + data.user.kakuhen + "回";
+            document.getElementById("total").innerText = "TOTAL: " + data.user.total;
+            document.getElementById("get_per").innerText = "GET: " + data.user.now_get + "/" + data.user.get;
+            document.getElementById("userBalance").innerText = "所持金: " + data.user.balance + "玉";
+            document.getElementById("stockInfo").innerText = "保留: [" + data.user.stock_display.join(',') + "]";
+
+            if (data.hit){
+                const colorClass = colorMapping[data.user.stock_display.slice(-1)[0]];
+
+                if (colorClass) {
+                    createBall(colorClass);
+                }
+            }
+            else{
+                const colorClass = colorMapping["黒"];
+                if (colorClass) {
+                    createBall(colorClass);
+                }
+            }
+        }
+       });
+    }
+
+        function createBall(colorClass) {
+        const ballElem = document.createElement('div');
+        ballElem.classList.add('ball', colorClass);
+        document.getElementById('ballArea').appendChild(ballElem);
+
+        ballElem.addEventListener('animationend', () => {
+            ballElem.remove();
+        });
+    }
+    let interval;
+
+    document.getElementById("toggleSwitchSlot").addEventListener('change', function() {
+        if (this.checked) {
+            interval = setInterval(trySlot, 2500);
+        } else {
+            clearInterval(interval);
+        }
+    });
+    document.getElementById("toggleSwitchShot").addEventListener('change', function() {
+        if (this.checked) {
+            interval = setInterval(shot, 300);
+        } else {
+            clearInterval(interval);
+        }
+    });
+</script>
 </html>

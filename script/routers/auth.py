@@ -1,5 +1,7 @@
 import hashlib
 from datetime import datetime, timedelta
+
+import jose
 from jose import jwt
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
@@ -28,13 +30,15 @@ class auth_info(BaseModel):
     user_id: str = ""
     auth: bool = False
     permission: int = "-1"
+    new_token: str = ""
 
-    def __init__(self, user_id, auth, permission):
+    def __init__(self, user_id, auth, permission, new_token):
         super().__init__()
 
         self.user_id = user_id
         self.auth = auth
         self.permission = permission
+        self.new_token = new_token
 
 
 router = APIRouter()
@@ -86,7 +90,13 @@ async def create_account(auth_data: OAuth2PasswordRequestForm = Depends()):
             "permission": 0,
             "userid": auth_data.username,
             "password": hash_ps,
-            "balance": 5000
+            "balance": 5000,
+            "stock": [],
+            "stock_display": [],
+            "kakuhen": 0,
+            "now_get": 0,
+            "get": 0,
+            "total": 0
         }
         user_db.dump()
 
@@ -121,27 +131,30 @@ async def get_access_token(auth_data: OAuth2PasswordRequestForm = Depends()):
 
 def token_auth(token: str = Depends(oauth2_scheme)):
     user_db.load()
+    try:
+        payload = jwt.decode(token, KEY, ALGORITHM)
 
-    payload = jwt.decode(token, KEY, ALGORITHM)
+        user_id = payload["userid"]
+        hash_user_id = str_hash(user_id)
 
-    user_id = payload["userid"]
-    hash_user_id = str_hash(user_id)
-
-    user_id = user_id if hash_user_id in user_db() else ""
-    auth = False
-    if datetime.utcnow().timestamp() < payload["exp"] and user_id != "":
-        if user_db()[hash_user_id]["access_token"] == token:
-            auth = True
-    permission = user_db()[hash_user_id]["permission"] if auth else -1
-
-    if auth:
-        user_db()[hash_user_id]["access_token"] = create_access_token(user_id)
-        user_db.dump()
-    return auth_info(user_id, auth, permission)
+        user_id = user_id if hash_user_id in user_db() else ""
+        auth = False
+        if datetime.utcnow().timestamp() < payload["exp"] and user_id != "":
+            if user_db()[hash_user_id]["access_token"] == token:
+                auth = True
+        permission = user_db()[hash_user_id]["permission"] if auth else -1
+        new_token = ""
+        if auth:
+            new_token = create_access_token(user_id)
+            user_db()[hash_user_id]["access_token"] = new_token
+            user_db.dump()
+        return auth_info(user_id, auth, permission, new_token)
+    except jose.exceptions.ExpiredSignatureError:
+        return auth_info("", False, -1, "")
 
 
 @router.delete("/user/delete")
-def delete_account(delete_id: str, auth: auth_info = Depends(token_auth)):
+def delete_account(response: Response, delete_id: str, auth: auth_info = Depends(token_auth)):
     if auth.auth is False:
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
 
@@ -153,6 +166,17 @@ def delete_account(delete_id: str, auth: auth_info = Depends(token_auth)):
     if auth.permission < delete_user["permission"] or auth.user_id == delete_user["userid"]:
         user_db().pop(str_hash(delete_id))
         user_db.dump()
-        return JSONResponse(status_code=status.HTTP_200_OK, content=delete_user)
+        json_resp = JSONResponse(status_code=status.HTTP_200_OK, content=delete_user)
+        json_resp.set_cookie("access_token", auth.new_token, expires=datetime.utcnow() + timedelta(minutes=15))
+
+        return json_resp
     else:
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+
+
+def set_token_cookie(new_token, response):
+    response.set_cookie("access_token", new_token,
+                        expires=str(datetime.utcnow() + timedelta(minutes=15)),
+                        secure=True,
+                        samesite=None)
+    return response

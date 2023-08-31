@@ -2,7 +2,7 @@ import uvicorn
 from pydantic import BaseModel
 from fastapi import FastAPI, Form, Request
 from fastapi.templating import Jinja2Templates
-from routers import users, auth
+from routers import users, auth, game
 from script.DB import json_db
 
 app = FastAPI()
@@ -11,6 +11,7 @@ templates = Jinja2Templates(directory="routers/page/")
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(game.router)
 
 user_db = json_db.DB("DB/users.json")
 
