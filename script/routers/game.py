@@ -63,17 +63,23 @@ async def get_try(access_token: Optional[str] = Cookie(None)):
     if len(user_db()[str_hash(auth.user_id)]["stock"]) <= 0:
         return set_token_cookie(auth.new_token, Response(status_code=status.HTTP_423_LOCKED))
     if auth.auth:
+        if user_db()[str_hash(auth.user_id)]["kakuhen"] > 0:
+            user_db()[str_hash(auth.user_id)]["kakuhen"] -= 1
         result = user_db()[str_hash(auth.user_id)]["stock"].pop(0)
         user_db()[str_hash(auth.user_id)]["stock_display"].pop(0)
         user_db.dump()
         staging = select_staging(result)
         if staging["continue"]:
+            if user_db()[str_hash(auth.user_id)]["kakuhen"] > 0:
+                user_db()[str_hash(auth.user_id)]["kakuhen"] += 1
             num = random.randrange(result + 1)
             user_db()[str_hash(auth.user_id)]["stock"].insert(0, num)
             user_db()[str_hash(auth.user_id)]["stock_display"].insert(0, calc_stock(num))
         elif staging["jackpot"]:
+            user_db()[str_hash(auth.user_id)]["Rush"] += 1
             if user_db()[str_hash(auth.user_id)]["total"] == 0:
                 user_db()[str_hash(auth.user_id)]["get"] = 200
+                user_db()[str_hash(auth.user_id)]["kakuhen"] = 80 + random.randrange(2) * 40
             else:
                 get_bonus = random.randrange(1, 20)
                 get_bonus = random.randrange(1, get_bonus + 1)
@@ -108,22 +114,23 @@ async def get_shot(access_token: Optional[str] = Cookie(None)):
     if auth.auth:
         is_hit = False
         if user_db()[str_hash(auth.user_id)]["get"] > 0:
-            if user_db()[str_hash(auth.user_id)]["now_get"] > user_db()[str_hash(auth.user_id)]["get"]:
-                user_db()[str_hash(auth.user_id)]["get"] = 0
 
             user_db()[str_hash(auth.user_id)]["now_get"] += 13
             user_db()[str_hash(auth.user_id)]["total"] += 13
             user_db()[str_hash(auth.user_id)]["balance"] += 13
 
+            if user_db()[str_hash(auth.user_id)]["now_get"] > user_db()[str_hash(auth.user_id)]["get"]:
+                user_db()[str_hash(auth.user_id)]["get"] = 0
+                user_db()[str_hash(auth.user_id)]["now_get"] = 0
         else:
 
             lot = random.randrange(30)
             if user_db()[str_hash(auth.user_id)]["kakuhen"] > 0:
-                user_db()[str_hash(auth.user_id)]["kakuhen"] -= 1
                 lot = random.randrange(2, 8)
             else:
                 user_db()[str_hash(auth.user_id)]["now_get"] = 0
                 user_db()[str_hash(auth.user_id)]["total"] = 0
+                user_db()[str_hash(auth.user_id)]["Rush"] = 0
 
             if lot < 2:
                 user_db()[str_hash(auth.user_id)]["balance"] += random.randrange(4) + 2
@@ -132,7 +139,7 @@ async def get_shot(access_token: Optional[str] = Cookie(None)):
                 if len(user_db()[str_hash(auth.user_id)]["stock"]) < 5:
                     stock_temp = random.randrange(319)
                     if user_db()[str_hash(auth.user_id)]["kakuhen"] > 0:
-                        stock_temp = random.randrange(98)
+                        stock_temp = random.randrange(127)
                     user_db()[str_hash(auth.user_id)]["stock"].append(stock_temp)
                     user_db()[str_hash(auth.user_id)]["stock_display"].append(calc_stock(stock_temp))
                     is_hit = True

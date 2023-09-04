@@ -81,7 +81,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: fadeInOut 1.5s forwards;
+    animation: fadeInOut 2.0s forwards;
 }
 @keyframes fadeIn {
     from {
@@ -175,6 +175,7 @@ input:checked + .slider:before {
         <h2 id="userBalance">所持金: {{ user.balance }}玉</h2>
     </section>
     <section>
+        <h2 id="Rush">Rush: {{ user.Rush }}</h2>
         <h2 id="kakuhen">確変(残り): {{ user.kakuhen }}回</h2>
     </section>
     <section>
@@ -295,6 +296,7 @@ input:checked + .slider:before {
         .then(data => {
         if(data){
                 document.getElementById("kakuhen").innerText = "確変(残り): " + data.user.kakuhen + "回";
+                document.getElementById("Rush").innerText = "Rush: " + data.user.Rush;
                 document.getElementById("total").innerText = "TOTAL: " + data.user.total;
                 document.getElementById("get_per").innerText = "GET: " + data.user.now_get + "/" + data.user.get;
                 document.getElementById("userBalance").innerText = "所持金: " + data.user.balance + "玉";
@@ -330,9 +332,9 @@ input:checked + .slider:before {
 
 
                 if (data.result.jackpot){
-                    showMessage("大当たり！");
-                    showMessage(data.user.kakuhen + "Rush獲得");
-                    showMessage(data.user.get + "玉獲得");
+                    alert("大当たり！");
+                    alert("確変" + data.user.kakuhen + "回転獲得");
+                    alert(data.user.get + "玉獲得");
                 }
 
             }
@@ -351,6 +353,7 @@ input:checked + .slider:before {
         .then(data => {
          if(data){
             document.getElementById("kakuhen").innerText = "確変(残り): " + data.user.kakuhen + "回";
+            document.getElementById("Rush").innerText = "Rush: " + data.user.Rush;
             document.getElementById("total").innerText = "TOTAL: " + data.user.total;
             document.getElementById("get_per").innerText = "GET: " + data.user.now_get + "/" + data.user.get;
             document.getElementById("userBalance").innerText = "所持金: " + data.user.balance + "玉";

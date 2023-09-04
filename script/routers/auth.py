@@ -96,6 +96,7 @@ async def create_account(auth_data: OAuth2PasswordRequestForm = Depends()):
             "kakuhen": 0,
             "now_get": 0,
             "get": 0,
+            "Rush": 0,
             "total": 0
         }
         user_db.dump()
